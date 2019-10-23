@@ -4,6 +4,8 @@ import com.google.gson.Gson;
 import edu.upm.midas.constants.Constants;
 import edu.upm.midas.model.*;
 import edu.upm.midas.common.util.StaticUtils;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import uk.ac.shef.wit.simmetrics.similaritymetrics.AbstractStringMetric;
@@ -25,8 +27,7 @@ import java.util.List;
 @Service
 public class ValidationService {
 
-    @Autowired
-    private FindingsManager findingsManager;
+    private static final Logger logger = LoggerFactory.getLogger(ValidationService.class);
 
 
     /**
@@ -37,11 +38,12 @@ public class ValidationService {
      * @throws Exception
      */
     public List<MatchNLP> doValidation(List<Concept> conceptList) throws Exception {//
+        FindingsManager findingsManager = new FindingsManager();
         List<ValidationFinding> validationFindings = findingsManager.loadAllFindings( );
         List<MatchNLP> matchNLPList = new ArrayList<>();
         int conceptCount = 1;int conceptListSize = conceptList.size();
         for (Concept concept: conceptList) {
-            System.out.println(conceptCount +". to " + conceptListSize + " => " + concept.getCui() + " | " + concept.getName());
+            logger.info(conceptCount +". to " + conceptListSize + " => " + concept.getCui() + " | " + concept.getName());
             matchNLPList.add( validate(concept, validationFindings) );
             conceptCount++;
         }
@@ -207,43 +209,47 @@ public class ValidationService {
 
     /**
      * @param jsonBody
-     * @param snapshot
+     * @param request
      * @throws IOException
      */
     public void writeJSONFile(String jsonBody, Request request) throws IOException {
         String fileName = request.getSnapshot() + Constants.UNDER_SCORE + request.getSource() + Constants.TVP_RETRIEVAL_FILE_NAME + Constants.DOT_JSON;
         String path = Constants.TVP_RETRIEVAL_HISTORY_FOLDER + fileName;
-        InputStream in = getClass().getResourceAsStream(path);
-        //BufferedReader bL = new BufferedReader(new InputStreamReader(in));
-        File file = new File(path);
-        BufferedWriter bW;
+        try {
+            InputStream in = getClass().getResourceAsStream(path);
+            //BufferedReader bL = new BufferedReader(new InputStreamReader(in));
+            File file = new File(path);
+            BufferedWriter bW;
 
-        if (!file.exists()){
-            bW = new BufferedWriter(new FileWriter(file));
-            bW.write(jsonBody);
-            bW.close();
+            if (!file.exists()) {
+                bW = new BufferedWriter(new FileWriter(file));
+                bW.write(jsonBody);
+                bW.close();
+            }
+        }catch (Exception e){
+            logger.error("Error while writing json file {} ", path, e);
         }
     }
 
 
     /**
      * @param snapshot
+     * @param source
      * @return
      * @throws Exception
      */
-    public Response readMetamapResponseJSON(String snapshot) throws Exception {
+    public Response readJSONFile(String snapshot, String source) throws Exception {
         Response response = new Response();
-        System.out.println("Read JSON!...");
         Gson gson = new Gson();
-        String fileName = snapshot + Constants.TVP_RETRIEVAL_FILE_NAME + Constants.DOT_JSON;
+        String fileName = snapshot + Constants.UNDER_SCORE + source + Constants.TVP_RETRIEVAL_FILE_NAME + Constants.DOT_JSON;
         String path = Constants.TVP_RETRIEVAL_HISTORY_FOLDER + fileName;
-        System.out.println("Read JSON!..." + path);
+        logger.info("Read JSON!..." + path);
 
         try {
             BufferedReader br = new BufferedReader(new FileReader(path));
             response = gson.fromJson(br, Response.class);
         }catch (Exception e){
-            System.out.println("Error to read or convert JSON!...");
+            logger.error("Error to read or convert JSON! ({})", path, e);
         }
 
         /*for (edu.upm.midas.data.validation.metamap.model.response.Text text: resp.getTexts()) {
